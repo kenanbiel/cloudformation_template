@@ -1,0 +1,53 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: RDS Cloudformation Template
+
+Parameters:
+  InstanceClass:
+      Description: EC2 Instance Type
+      Type: String
+      Default: db.t2.micro
+      AllowedValues:
+      - db.t2.micro
+      - db.m4.large
+      - db.m4.xlarge
+      - db.m4.2xlarge
+
+  InstanceRegion:
+    Description: "Regions Available"
+    Type: CommaDelimitedList
+    Default: "ap-southeast-1"
+
+  InstanceZone:
+    Description: "Zones Available"
+    Type: CommaDelimitedList
+    Default: "ap-southeast-1a, ap-southeast-1b"
+
+Resources:
+  rdssubnet:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet to be associated with RDS MySQL
+      SubnetIds:
+      - !ImportValue 'subnet1'
+      - !ImportValue 'subnet2'
+
+
+  proddb: 
+    Type: AWS::RDS::DBInstance
+    Properties: 
+      AllocatedStorage: 100
+      AvailabilityZone: !Select [0, !Ref InstanceZone]
+      DBInstanceClass: !Ref InstanceClass
+      DBSubnetGroupName: !Ref rdssubnet
+      Engine: MySQL
+      EngineVersion: 5.6.21
+      Iops: 1000
+      MasterUsername: DBUser
+      MasterUserPassword: DBPassword
+      VPCSecurityGroups:
+      - !ImportValue securitygroup-rds
+      Tags:
+      - Key: Name
+        Value: prod-rds
+    DeletionPolicy: Snapshot

@@ -1,0 +1,103 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "FrontEnd App CloudFormation Template"
+
+Parameters:
+  InstanceType:
+    Description: "EC2 Instance Type"
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+    - t1.micro
+    - t2.nano
+    - t2.micro
+    - t2.small
+
+  InstanceRegion:
+    Description: "Regions Available"
+    Type: CommaDelimitedList
+    Default: "ap-southeast-1"
+
+  InstanceZone:
+    Description: "Zones Available"
+    Type: CommaDelimitedList
+    Default: "ap-southeast-1a, ap-southeast-1b"
+
+Resources:
+  ProdFrontEndELB:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+       Subnets: 
+       - !ImportValue 'subnet1'
+       - !ImportValue 'subnet2'
+       Listeners:
+       - LoadBalancerPort: '80'
+         InstancePort: '80'
+         InstanceProtocol: HTTP
+         Protocol: HTTP
+       - LoadBalancerPort: '443'
+         InstancePort: '443'
+         InstanceProtocol: HTTPS
+         Protocol: HTTPS
+       HealthCheck:
+          Target: HTTPS:443/index.html
+          HealthyThreshold: '3'
+          UnhealthyThreshold: '2'
+          Interval: '10'
+          Timeout: '5'
+       Tags:
+       - Key: name
+         Value: ProdFrontEndELB          
+
+  ProdFrontEndLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: ami-25c00c46
+      InstanceType: !Ref InstanceType
+      # KeyName: 
+      SecurityGroups:
+      - !ImportValue 'securitygroup-ssh'         
+      - !ImportValue 'securitygroup-management'
+      - !ImportValue 'securitygroup-frontend'
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          wget -O - https://repo.saltstack.com/apt/ubuntu/14.04/amd64/latest/SALTSTACK-GPG-KEY.pub | apt-key add -
+          echo "deb http://repo.saltstack.com/apt/ubuntu/14.04/amd64/2016.11 trusty main" > /etc/apt/sources.list.d/saltstack.list
+          apt-get update
+          apt-get upgrade -y
+          apt-get install -y salt-minion
+          apt-get install -y python-pip
+          pip install boto
+          pip install awscli
+          service salt-minion stop
+          rm -f /etc/salt/minion_id
+          
+  ProdFrontEnd:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AvailabilityZones:
+      - !Select [0, !Ref InstanceZone]
+      - !Select [1, !Ref InstanceZone]
+      HealthCheckType: EC2
+      LaunchConfigurationName: !Ref ProdFrontEndLaunchConfig
+      LoadBalancerNames:
+      - !Ref ProdFrontEndELB
+      MinSize: 1
+      MaxSize: 2
+      Tags:
+      - Key: environment
+        Value: production
+        PropagateAtLaunch: true
+      - Key: role
+        Value: frontend
+        PropagateAtLaunch: true
+      - Key: location
+        Value: !Select [0, !Ref InstanceRegion]
+        PropagateAtLaunch: true
+      - Key: type
+        Value: web
+        PropagateAtLaunch: true
+      VPCZoneIdentifier:
+      - !ImportValue subnet1
+      - !ImportValue subnet2

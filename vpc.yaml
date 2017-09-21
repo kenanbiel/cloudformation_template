@@ -1,0 +1,114 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "VPC Cloudformation Template"
+
+Parameters:
+  InstanceRegion:
+    Description: "Regions Available"
+    Type: CommaDelimitedList
+    Default: "ap-southeast-1"
+
+  InstanceZone:
+    Description: "Zones Available"
+    Type: CommaDelimitedList
+    Default: "ap-southeast-1a, ap-southeast-1b"
+
+
+Resources:
+   Vpc:
+      Type: AWS::EC2::VPC
+      Properties:
+         CidrBlock: "10.10.0.0/16"
+         EnableDnsSupport: true
+         EnableDnsHostnames: true
+         Tags:
+         - Key: Name
+           Value: 
+         - Key: StackName
+           Value: AWS::StackName
+         - Key: VpcLocation    
+           Value: !Select [0, !Ref InstanceRegion]
+
+   Subnet1:
+      Type: AWS::EC2::Subnet
+      Properties:
+         CidrBlock: "10.10.0.0/24"
+         VpcId: !Ref Vpc
+         AvailabilityZone: !Select [0, !Ref InstanceZone]
+         Tags:
+         - Key: Name
+           Value: Subnet1
+         - Key: VPC
+           Value: Vpc
+         - Key: VpcLocation
+           Value: !Select [0, !Ref InstanceZone]
+
+   Subnet1Pub:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+         RouteTableId:  !Ref RouteTable
+         SubnetId: !Ref Subnet1
+
+   Subnet2:
+      Type: AWS::EC2::Subnet
+      Properties:
+         CidrBlock: "10.10.1.0/24"
+         VpcId: !Ref Vpc
+         AvailabilityZone: !Select [1, !Ref InstanceZone]
+         Tags:
+         - Key: Name
+           Value: Subnet2
+         - Key: VPC
+           Value: Vpc
+         - Key: VpcLocation
+           Value: !Select [1, !Ref InstanceZone]
+
+   Subnet2Pub:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+         RouteTableId:  !Ref RouteTable
+         SubnetId: !Ref Subnet2
+
+   VpcInternetGateway:
+      Type: AWS::EC2::InternetGateway
+      Properties:
+         Tags:
+         - Key: Application
+           Value: AWS::StackId
+
+   VpcGatewayAttachment:
+      Type: AWS::EC2::VPCGatewayAttachment
+      Properties:
+         InternetGatewayId: !Ref VpcInternetGateway
+         VpcId:  !Ref Vpc
+
+   RouteTable:
+      Type: AWS::EC2::RouteTable
+      Properties:
+         VpcId: !Ref Vpc
+      DependsOn: Vpc
+
+   DefaultRoute:
+      Type: AWS::EC2::Route
+      DependsOn: VpcInternetGateway
+      Properties:
+         RouteTableId: !Ref RouteTable
+         DestinationCidrBlock: 0.0.0.0/0
+         GatewayId: !Ref VpcInternetGateway
+
+Outputs:
+   VPCName:
+      Description: The VPC Used
+      Value: !Ref Vpc
+      Export:
+        Name: main-vpc
+   Subnet1:
+      Description: Subnet1
+      Value: !Ref Subnet1
+      Export:
+        Name: subnet1
+   Subnet2:
+      Description: Subnet2
+      Value: !Ref Subnet2
+      Export:
+        Name: subnet2

@@ -1,0 +1,159 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Security Group CloudFormation Template"
+
+Resources:
+  MangementSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: This is the default security group for Monitoring and Config Management
+      VpcId: !ImportValue 'main-vpc'
+      SecurityGroupIngress: 
+
+      # Graphite
+      - IpProtocol: tcp
+        FromPort: 2003
+        ToPort: 2003
+        CidrIp: 10.10.0.0/16
+
+      # SaltStack
+      - IpProtocol: tcp
+        FromPort: 4005
+        ToPort: 4005
+        CidrIp: 10.10.0.0/16
+      - IpProtocol: tcp
+        FromPort: 4006
+        ToPort: 4006
+        CidrIp: 10.10.0.0/16  
+
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        FromPort: 0
+        ToPort: 65535
+        CidrIp: 0.0.0.0/0
+      Tags:
+      - Key: Name
+        Value: prod-monitoring-config-mgmt      
+
+  SSHSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: This is the default security group for SSH only
+      VpcId: !ImportValue 'main-vpc'
+      SecurityGroupIngress: 
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 10.10.0.0/16
+      Tags:
+      - Key: Name
+        Value: prod-ssh
+
+  FrontEndELBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: This is the default security group for FrontEnd ELB
+      VpcId: !ImportValue 'main-vpc'
+      SecurityGroupIngress: 
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443 
+      Tags:
+      - Key: Name
+        Value: prod-frontend-elb        
+
+  FrontEndSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: This is the default security group for FrontEnd App
+      VpcId: !ImportValue 'main-vpc'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 10.10.0.0/0   
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 10.10.0.0/0
+      Tags:
+      - Key: Name
+        Value: prod-frontend        
+
+  BackEndElbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !ImportValue 'main-vpc'
+      GroupDescription: This is the default security group for BackOffice
+      SecurityGroupIngress: 
+      - IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443
+        SourceSecurityGroupId: !Ref FrontEndSecurityGroup
+      Tags:
+      - Key: Name
+        Value: prod-backoffice-internal
+
+  BackEndSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !ImportValue 'main-vpc'
+      GroupDescription: This is the default security group for BackEnd
+      SecurityGroupIngress: 
+      - IpProtocol: tcp
+        FromPort: 8443
+        ToPort: 8443
+        SourceSecurityGroupId: !Ref BackEndElbSecurityGroup
+      Tags:
+      - Key: Name
+        Value: prod-backend
+
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: This is the default security group for RDS
+      VpcId: !ImportValue 'main-vpc'
+      SecurityGroupIngress: 
+      - IpProtocol: tcp
+        FromPort: 3306
+        ToPort: 3306
+        CidrIp: 10.10.0.0/16
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        FromPort: 0
+        ToPort: 65535
+        CidrIp: 0.0.0.0/0
+      Tags:
+      - Key: Name
+        Value: prod-rds
+
+Outputs:
+  ManagementSecurityGroup:
+    Description: Default Security Group for all  Instances
+    Value: !Ref MangementSecurityGroup
+    Export:
+      Name: securitygroup-management
+  FrontEndSecurityGroup:
+    Description: Default Security Group for FrontEnd
+    Value: !Ref FrontEndSecurityGroup
+    Export:
+      Name: securitygroup-frontend
+  BackEndSecurityGroup:
+    Description: Default Security Group for BackEnd
+    Value: !Ref BackEndSecurityGroup
+    Export:
+      Name: securitygroup-backend      
+  SSHSecurityGroup:
+    Description: Default Security Group for SSH
+    Value: !Ref SSHSecurityGroup
+    Export:
+      Name: securitygroup-ssh               
+  RDSSecurityGroup:
+    Description: Default Security Group for RDS
+    Value: !Ref RDSSecurityGroup
+    Export:
+      Name: securitygroup-rds
